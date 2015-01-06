@@ -448,6 +448,10 @@ ifndef::git-format-patch[]
 	not in a subdirectory (e.g. in a bare repository), you
 	can name which subdirectory to make the output relative
 	to by giving a <path> as an argument.
+
+--no-relative::
+	Turn off relative pathnames and include all changes in the
+	repository.
 endif::git-format-patch[]
 
 -a::

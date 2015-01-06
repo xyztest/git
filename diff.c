@@ -3695,6 +3695,8 @@ int diff_opt_parse(struct diff_options *options, const char **av, int ac)
 		DIFF_OPT_SET(options, RELATIVE_NAME);
 		options->prefix = arg;
 	}
+	else if (!strcmp(arg, "--no-relative"))
+		DIFF_OPT_CLR(options, RELATIVE_NAME);
 
 	/* xdiff options */
 	else if (!strcmp(arg, "--minimal"))
