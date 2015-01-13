@@ -9,7 +9,9 @@ USAGE="list [<options>]
    or: $dashless branch <branchname> [<stash>]
    or: $dashless [save [--patch] [-k|--[no-]keep-index] [-q|--quiet]
 		       [-u|--include-untracked] [-a|--all] [<message>]]
-   or: $dashless clear"
+   or: $dashless clear
+   or: $dashless create [<message>]
+   or: $dashless store [-m|--message <message>] [-q|--quiet] <commit>"
 
 SUBDIRECTORY_OK=Yes
 OPTIONS_SPEC=
