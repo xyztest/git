@@ -1364,7 +1364,7 @@ static int resolve_gitlink_ref_recursive(struct ref_cache *refs,
 {
 	int fd, len;
 	char buffer[128], *p;
-	char *path;
+	const char *path;
 
 	if (recursion > MAXDEPTH || strlen(refname) > MAXREFLEN)
 		return -1;
@@ -1457,7 +1457,11 @@ static int resolve_missing_loose_ref(const char *refname,
 }
 
 /* This function needs to return a meaningful errno on failure */
-const char *resolve_ref_unsafe(const char *refname, int resolve_flags, unsigned char *sha1, int *flags)
+static const char *resolve_ref_unsafe_1(const char *refname,
+					int resolve_flags,
+					unsigned char *sha1,
+					int *flags,
+					struct strbuf *sb_path)
 {
 	int depth = MAXDEPTH;
 	ssize_t len;
@@ -1488,7 +1492,7 @@ const char *resolve_ref_unsafe(const char *refname, int resolve_flags, unsigned 
 		bad_name = 1;
 	}
 	for (;;) {
-		char path[PATH_MAX];
+		const char *path;
 		struct stat st;
 		char *buf;
 		int fd;
@@ -1498,7 +1502,9 @@ const char *resolve_ref_unsafe(const char *refname, int resolve_flags, unsigned 
 			return NULL;
 		}
 
-		git_snpath(path, sizeof(path), "%s", refname);
+		strbuf_reset(sb_path);
+		strbuf_git_path(sb_path, "%s", refname);
+		path = sb_path->buf;
 
 		/*
 		 * We might have to loop back here to avoid a race
@@ -1623,6 +1629,16 @@ const char *resolve_ref_unsafe(const char *refname, int resolve_flags, unsigned 
 			bad_name = 1;
 		}
 	}
+}
+
+const char *resolve_ref_unsafe(const char *refname, int resolve_flags,
+			       unsigned char *sha1, int *flags)
+{
+	struct strbuf sb_path = STRBUF_INIT;
+	const char *ret = resolve_ref_unsafe_1(refname, resolve_flags,
+					       sha1, flags, &sb_path);
+	strbuf_release(&sb_path);
+	return ret;
 }
 
 char *resolve_refdup(const char *ref, int resolve_flags, unsigned char *sha1, int *flags)
@@ -2251,7 +2267,7 @@ static struct ref_lock *lock_ref_sha1_basic(const char *refname,
 					    const struct string_list *skip,
 					    int flags, int *type_p)
 {
-	char *ref_file;
+	const char *ref_file;
 	const char *orig_refname = refname;
 	struct ref_lock *lock;
 	int last_errno = 0;
@@ -2325,7 +2341,7 @@ static struct ref_lock *lock_ref_sha1_basic(const char *refname,
 		lock->force_write = 1;
 
  retry:
-	switch (safe_create_leading_directories(ref_file)) {
+	switch (safe_create_leading_directories_const(ref_file)) {
 	case SCLD_OK:
 		break; /* success */
 	case SCLD_VANISHED:
@@ -2767,7 +2783,7 @@ static int rename_tmp_log(const char *newrefname)
 	int attempts_remaining = 4;
 
  retry:
-	switch (safe_create_leading_directories(git_path("logs/%s", newrefname))) {
+	switch (safe_create_leading_directories_const(git_path("logs/%s", newrefname))) {
 	case SCLD_OK:
 		break; /* success */
 	case SCLD_VANISHED:
@@ -2955,11 +2971,15 @@ static int copy_msg(char *buf, const char *msg)
 }
 
 /* This function must set a meaningful errno on failure */
-int log_ref_setup(const char *refname, char *logfile, int bufsize)
+int log_ref_setup(const char *refname, struct strbuf *sb_logfile)
 {
 	int logfd, oflags = O_APPEND | O_WRONLY;
+	char *logfile;
 
-	git_snpath(logfile, bufsize, "logs/%s", refname);
+	strbuf_git_path(sb_logfile, "logs/%s", refname);
+	logfile = sb_logfile->buf;
+	/* make sure the rest of the function can't change "logfile" */
+	sb_logfile = NULL;
 	if (log_all_ref_updates &&
 	    (starts_with(refname, "refs/heads/") ||
 	     starts_with(refname, "refs/remotes/") ||
@@ -3030,18 +3050,22 @@ static int log_ref_write_fd(int fd, const unsigned char *old_sha1,
 	return 0;
 }
 
-static int log_ref_write(const char *refname, const unsigned char *old_sha1,
-			 const unsigned char *new_sha1, const char *msg)
+static int log_ref_write_1(const char *refname, const unsigned char *old_sha1,
+			   const unsigned char *new_sha1, const char *msg,
+			   struct strbuf *sb_log_file)
 {
 	int logfd, result, oflags = O_APPEND | O_WRONLY;
-	char log_file[PATH_MAX];
+	char *log_file;
 
 	if (log_all_ref_updates < 0)
 		log_all_ref_updates = !is_bare_repository();
 
-	result = log_ref_setup(refname, log_file, sizeof(log_file));
+	result = log_ref_setup(refname, sb_log_file);
 	if (result)
 		return result;
+	log_file = sb_log_file->buf;
+	/* make sure the rest of the function can't change "log_file" */
+	sb_log_file = NULL;
 
 	logfd = open(log_file, oflags);
 	if (logfd < 0)
@@ -3062,6 +3086,15 @@ static int log_ref_write(const char *refname, const unsigned char *old_sha1,
 		return -1;
 	}
 	return 0;
+}
+
+static int log_ref_write(const char *refname, const unsigned char *old_sha1,
+			 const unsigned char *new_sha1, const char *msg)
+{
+	struct strbuf sb = STRBUF_INIT;
+	int ret = log_ref_write_1(refname, old_sha1, new_sha1, msg, &sb);
+	strbuf_release(&sb);
+	return ret;
 }
 
 int is_branch(const char *refname)
