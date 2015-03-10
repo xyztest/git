@@ -146,6 +146,9 @@ struct rev_info {
 			track_first_time:1,
 			linear:1;
 
+	/* cmd type */
+	unsigned int  cmd_is_show:1;
+
 	enum date_mode date_mode;
 
 	unsigned int	abbrev;

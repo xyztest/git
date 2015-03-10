@@ -1399,6 +1399,8 @@ void init_revisions(struct rev_info *revs, const char *prefix)
 
 	revs->commit_format = CMIT_FMT_DEFAULT;
 
+	revs->cmd_is_show = 0;
+
 	init_grep_defaults();
 	grep_init(&revs->grep_filter, prefix);
 	revs->grep_filter.status_only = 1;
@@ -2339,6 +2341,8 @@ int setup_revisions(int argc, const char **argv, struct rev_info *revs, struct s
 
 	if (revs->reflog_info && revs->graph)
 		die("cannot combine --walk-reflogs with --graph");
+	if (!revs->cmd_is_show && revs->no_walk && revs->graph)
+		die("cannot combine --no-walk with --graph");
 	if (!revs->reflog_info && revs->grep_filter.use_reflog_filter)
 		die("cannot use --grep-reflog without --walk-reflogs");
 
